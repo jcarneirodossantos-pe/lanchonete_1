@@ -1,3 +1,17 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import Categoria, Produto
+
+
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "descricao")
+    search_fields = ("nome",)
+
+
+@admin.register(Produto)
+class ProdutoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "preco", "disponivel", "categoria")
+    list_filter = ("disponivel", "categoria")
+    search_fields = ("nome",)
+    autocomplete_fields = ("categoria",)
