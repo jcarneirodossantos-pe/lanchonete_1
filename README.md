@@ -1,26 +1,17 @@
 # Cardápio da Lanchonete
 
-Projeto Django para manter categorias e produtos de uma lanchonete. O cadastro pode
-ser feito pelo Django Admin ou pela API REST; a API também pode servir de base para
-um futuro site ou aplicativo de pedidos.
-
-## Requisitos
 
 - Python 3.12 ou superior (compatível com a versão Django fixada no projeto)
 - Dependências listadas em `requirements.txt`
 
 ## Instalação e execução
 
-Na pasta do projeto, crie e ative um ambiente virtual e instale as dependências:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
-
-No Windows, ative o ambiente com `.venv\Scripts\activate`. Em seguida, crie as
-tabelas e uma conta de administrador:
 
 ```bash
 python manage.py migrate
