@@ -1,10 +1,14 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db.models import ProtectedError
 from django.test import TestCase
+from rest_framework import serializers
 from rest_framework.test import APIClient
 
-from .models import Categoria, Produto
+from .models import AreaEntrega, Categoria, Produto
+from .serializers import AreaEntregaSerializer
 
 
 class CardapioApiTests(TestCase):
@@ -136,6 +140,81 @@ class CardapioApiTests(TestCase):
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta.data["count"], 1)
         self.assertEqual(resposta.data["results"][0]["nome"], "Suco")
+
+    def test_categoria_com_produtos_nao_pode_ser_excluida(self):
+        Produto.objects.create(
+            nome="Suco",
+            preco=Decimal("8.50"),
+            categoria=self.categoria,
+        )
+
+        with self.assertRaises(ProtectedError):
+            self.categoria.delete()
+
+    @patch("cardapio.views.requests.get")
+    def test_municipios_por_uf_consulta_api_do_ibge(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.raise_for_status.return_value = None
+        mock_get.return_value.json.return_value = [
+            {"id": 2611606, "nome": "Recife"},
+            {"id": 2611705, "nome": "Jaboatão dos Guararapes"},
+        ]
+
+        resposta = self.client.get("/api/municipios/?uf=PE")
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.data["total"], 2)
+        self.assertEqual(resposta.data["municipios"][0]["nome"], "Recife")
+        mock_get.assert_called_once_with(
+            "https://servicodados.ibge.gov.br/api/v1/localidades/estados/PE/municipios",
+            timeout=15,
+        )
+
+    def test_municipios_retorna_400_quando_uf_vazia_ou_invalida(self):
+        resposta = self.client.get("/api/municipios/")
+        self.assertEqual(resposta.status_code, 400)
+
+        resposta = self.client.get("/api/municipios/?uf=PE123")
+        self.assertEqual(resposta.status_code, 400)
+
+    @patch("cardapio.views.requests.get")
+    def test_municipios_retorna_503_quando_ibge_fora_do_ar(self, mock_get):
+        mock_get.side_effect = Exception("timeout")
+
+        resposta = self.client.get("/api/municipios/?uf=PE")
+
+        self.assertEqual(resposta.status_code, 503)
+        self.assertIn("Não foi possível consultar os municípios", resposta.data["detail"])
+
+    @patch("cardapio.serializers.requests.get")
+    def test_serializer_area_entrega_valida_codigo_ibge_real(self, mock_get):
+        mock_get.return_value.raise_for_status.return_value = None
+        mock_get.return_value.json.return_value = {"id": 2611606, "nome": "Recife"}
+
+        serializer = AreaEntregaSerializer(
+            data={
+                "municipio": "Recife",
+                "codigo_ibge": 2611606,
+                "taxa_entrega": "8.50",
+            }
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    @patch("cardapio.serializers.requests.get")
+    def test_serializer_area_entrega_rejeita_codigo_ibge_invalido(self, mock_get):
+        mock_get.return_value.raise_for_status.side_effect = Exception("err")
+
+        serializer = AreaEntregaSerializer(
+            data={
+                "municipio": "Cidade Inexistente",
+                "codigo_ibge": 9999999,
+                "taxa_entrega": "8.50",
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("codigo_ibge", serializer.errors)
 
     def test_documentacao_openapi_e_swagger_estao_disponiveis(self):
         resposta_schema = self.client.get("/api/schema/")

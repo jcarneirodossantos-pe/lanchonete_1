@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Categoria, Produto
+from .models import AreaEntrega, Categoria, Produto
 
 
 @admin.register(Categoria)
@@ -15,3 +15,10 @@ class ProdutoAdmin(admin.ModelAdmin):
     list_filter = ("disponivel", "categoria")
     search_fields = ("nome",)
     autocomplete_fields = ("categoria",)
+
+
+@admin.register(AreaEntrega)
+class AreaEntregaAdmin(admin.ModelAdmin):
+    list_display = ("municipio", "codigo_ibge", "taxa_entrega")
+    search_fields = ("municipio",)
+    list_filter = ("codigo_ibge",)
